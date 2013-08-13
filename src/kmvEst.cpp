@@ -1,4 +1,8 @@
-#include "../include/kmv_est.h"
+#include "../include/kmvEst.h"
+#include "../include/string_hash.h"
+
+// required for c++11 libraries (such as unordered_set)
+//#define __GXX_EXPERIMENTAL_CXX0X__
 
 #include <vector>
 #include <string>
@@ -6,6 +10,7 @@
 #include <algorithm>
 #include <cstring>
 #include <limits>
+#include <cstdint>
 
 #include <openssl/md4.h>
 #include <openssl/md5.h>
@@ -13,10 +18,15 @@
 
 using namespace std;
 
-kmv_est::kmv_est(const char* str, int k, int q_gram_length)
+bool kmvEst::HASH_FUNCTION_USED              = false;
+String_Hash::HASH_TYPE kmvEst::HASH_FUNCTION = String_Hash::HASH_TYPE::SHA;
+
+kmvEst::kmvEst(const char* str, unsigned int k, int q_gram_length)
 {
+	HASH_FUNCTION_USED = true;
+	String_Hash::stringHash* hasher = String_Hash::stringHash::getHashFunction(HASH_FUNCTION);
+
 	m_kmv_syn = new vector<uint64_t>( );
-	mp_hashstruct = (SHA_CTX*) malloc( sizeof(SHA_CTX) );
 
 	unordered_set<uint64_t> contained;
 
@@ -26,6 +36,8 @@ kmv_est::kmv_est(const char* str, int k, int q_gram_length)
 
 	for(int i = 0; i < end_idx; i++)
 	{
+		const uint64_t val = hasher->hash(str+i, q_gram_length);
+
 		if(!(contained.count(val) > 0)) // this is true if the value does not already exist in the set
 		{
 			if( m_kmv_syn->size() < k )
@@ -35,7 +47,7 @@ kmv_est::kmv_est(const char* str, int k, int q_gram_length)
 
 				// insert the value into the hash set
 				contained.insert(val);
-				max_vlaue_in_set = m_kmv_syn->front();
+				max_value_in_set = m_kmv_syn->front();
 			}else if( val < max_value_in_set )
 			{
 				// insert the new element into kmv
@@ -56,22 +68,24 @@ kmv_est::kmv_est(const char* str, int k, int q_gram_length)
 	}
 	// the elements were stored in a heap to make it more easy to work with.  We now sort it linearly
 	sort_heap(m_kmv_syn->begin(), m_kmv_syn->end());
+
+	// cleanup the hash function
+	delete hasher;
 }
 
-kmv_est::~kmv_est()
+kmvEst::~kmvEst()
 {
-	free(mp_hashstruct);
 	delete m_kmv_syn;
 }
 
-int kmv_est::get_DV()
+int kmvEst::get_DV()
 {
 	// I am using a double, because I don't know if accuracy is significantly effected by using a float
 	double U = (0.0 + m_kmv_syn->back()) / (sizeof(uint64_t) << 8);
 	return (int) (m_kmv_syn->size() - 1) / U;
 }
 
-int kmv_est::intersection_DV(const kmv_est *val) const
+int kmvEst::intersection_DV(const kmvEst *val) const
 {
 	int int_DV;
 	int un_DV;
@@ -81,7 +95,7 @@ int kmv_est::intersection_DV(const kmv_est *val) const
 	return int_DV;
 }
 
-int kmv_est::union_DV(const kmv_est *val) const
+int kmvEst::union_DV(const kmvEst *val) const
 {
 	int int_DV;
 	int un_DV;
@@ -91,7 +105,7 @@ int kmv_est::union_DV(const kmv_est *val) const
 	return un_DV;
 }
 
-float kmv_est::jaccard_est(const kmv_est *val) const
+float kmvEst::jaccard_est(const kmvEst *val) const
 {
 	int int_DV;
 	int un_DV;
@@ -101,7 +115,7 @@ float kmv_est::jaccard_est(const kmv_est *val) const
 	return jac_est;
 }
 
-void kmv_est::combine_DV(const kmv_est *val, int &intersection_DV, int &union_DV, float &jaccard_est) const
+void kmvEst::combine_DV(const kmvEst *val, int &intersection_DV, int &union_DV, float &jaccard_est) const
 {
 	// get the set with the smallest number of elements
 	int min_k = min( this->m_kmv_syn->size(), val->m_kmv_syn->size() );
@@ -134,7 +148,7 @@ void kmv_est::combine_DV(const kmv_est *val, int &intersection_DV, int &union_DV
 			last_hash = *it_b;
 			it_b++;
 		}
-		else // *it_a == *it_b
+		else // if *it_a == *it_b
 		{
 			intersection_count++;
 			last_hash = *it_b;
@@ -148,20 +162,6 @@ void kmv_est::combine_DV(const kmv_est *val, int &intersection_DV, int &union_DV
 	union_DV        = (min_k - 1) / U;
 	jaccard_est     = (float) intersection_count / min_k;
 	intersection_DV = jaccard_est * union_DV;
-}
-
-uint64_t kmv_est::hash(const char* str, int len)
-{
-	// the data array can be made static to slighly change performace, but it will
-	// cause this function to not be thread safe
-	unsigned char data[SHA_DIGEST_LENGTH];
-	uint64_t* r_val = (uint64_t*) &data;
-
-	SHA1_Init( mp_hashstruct );
-	SHA1_Update(mp_hashstruct, str, len);
-	SHA1_Final(data, mp_hashstruct);
-
-	return *r_val;
 }
 
 

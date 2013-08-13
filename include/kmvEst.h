@@ -48,7 +48,7 @@ public:
 	 * @param[in] k - the number of distict values to retain in the synopsis
 	 * @param[in] q_gram_length - the number of characters to grab for each set element
 	 */
-	//kmv_est(const char* str, int str_len, int k = 60, int q_gram_length = 6);
+	kmvEst(const char* str, int str_len, int k = 60, int q_gram_length = 6);
 
 	virtual ~kmvEst();
 
@@ -99,6 +99,8 @@ public:
 	static bool set_hash_function(String_Hash::HASH_TYPE type);
 
 private:
+	void initialize(const char* str, uint str_length, unsigned int k = 60, int q_gram_length = 6);
+
 	//HASH_TYPE hash_function_used;
 	// the synopsis values used to estimate distinct values
 	std::vector<uint64_t> *m_kmv_syn;

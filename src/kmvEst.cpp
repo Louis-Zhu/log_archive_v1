@@ -22,55 +22,15 @@ bool kmvEst::HASH_FUNCTION_USED              = false;
 String_Hash::HASH_TYPE kmvEst::HASH_FUNCTION = String_Hash::HASH_TYPE::SHA;
 
 kmvEst::kmvEst(const char* str, unsigned int k, int q_gram_length)
+: m_kmv_syn(NULL)
 {
-	HASH_FUNCTION_USED = true;
-	String_Hash::stringHash* hasher = String_Hash::stringHash::getHashFunction(HASH_FUNCTION);
+	this->initialize(str, strlen(str), k, q_gram_length);
+}
 
-	m_kmv_syn = new vector<uint64_t>( );
-
-	unordered_set<uint64_t> contained;
-
-	int strLen = strlen(str);
-	int end_idx = strLen - q_gram_length;
-	uint64_t max_value_in_set = 0; // the current max value in the k min value estimator list.
-
-	for(int i = 0; i < end_idx; i++)
-	{
-		const uint64_t val = hasher->hash(str+i, q_gram_length);
-
-		if(!(contained.count(val) > 0)) // this is true if the value does not already exist in the set
-		{
-			if( m_kmv_syn->size() < k )
-			{
-				m_kmv_syn->push_back(val);
-				push_heap(m_kmv_syn->begin(), m_kmv_syn->end());
-
-				// insert the value into the hash set
-				contained.insert(val);
-				max_value_in_set = m_kmv_syn->front();
-			}else if( val < max_value_in_set )
-			{
-				// insert the new element into kmv
-				m_kmv_syn->push_back(val);
-				push_heap(m_kmv_syn->begin(), m_kmv_syn->end());
-
-				// remove the largest element in kmv
-				// (because we are at the max number of elements to place in the estimator)
-				pop_heap(m_kmv_syn->begin(), m_kmv_syn->end());
-				contained.erase(m_kmv_syn->back()); // the last element in the vector will be the largest value.  Remove this from the contains set
-				m_kmv_syn->pop_back();
-
-				// insert the new value into the hash set
-				contained.insert(val);
-				max_value_in_set = m_kmv_syn->front();
-			}
-		}
-	}
-	// the elements were stored in a heap to make it more easy to work with.  We now sort it linearly
-	sort_heap(m_kmv_syn->begin(), m_kmv_syn->end());
-
-	// cleanup the hash function
-	delete hasher;
+kmvEst::kmvEst(const char* str, int str_len, int k, int q_gram_length)
+: m_kmv_syn(NULL)
+{
+	this->initialize(str, str_len, k, q_gram_length);
 }
 
 kmvEst::~kmvEst()
@@ -162,6 +122,60 @@ void kmvEst::combine_DV(const kmvEst *val, int &intersection_DV, int &union_DV, 
 	union_DV        = (min_k - 1) / U;
 	jaccard_est     = (float) intersection_count / min_k;
 	intersection_DV = jaccard_est * union_DV;
+}
+
+void kmvEst::initialize(const char* str,
+		                uint str_length,
+		                unsigned int k,
+		                int q_gram_length)
+{
+	HASH_FUNCTION_USED = true;
+	String_Hash::stringHash* hasher = String_Hash::stringHash::getHashFunction(HASH_FUNCTION);
+
+	m_kmv_syn = new vector<uint64_t>( );
+
+	unordered_set<uint64_t> contained;
+
+	int end_idx = str_length - q_gram_length;
+	uint64_t max_value_in_set = 0; // the current max value in the k min value estimator list.
+
+	for(int i = 0; i < end_idx; i++)
+	{
+		const uint64_t val = hasher->hash(str+i, q_gram_length);
+
+		if(!(contained.count(val) > 0)) // this is true if the value does not already exist in the set
+		{
+			if( m_kmv_syn->size() < k )
+			{
+				m_kmv_syn->push_back(val);
+				push_heap(m_kmv_syn->begin(), m_kmv_syn->end());
+
+				// insert the value into the hash set
+				contained.insert(val);
+				max_value_in_set = m_kmv_syn->front();
+			}else if( val < max_value_in_set )
+			{
+				// insert the new element into kmv
+				m_kmv_syn->push_back(val);
+				push_heap(m_kmv_syn->begin(), m_kmv_syn->end());
+
+				// remove the largest element in kmv
+				// (because we are at the max number of elements to place in the estimator)
+				pop_heap(m_kmv_syn->begin(), m_kmv_syn->end());
+				contained.erase(m_kmv_syn->back()); // the last element in the vector will be the largest value.  Remove this from the contains set
+				m_kmv_syn->pop_back();
+
+				// insert the new value into the hash set
+				contained.insert(val);
+				max_value_in_set = m_kmv_syn->front();
+			}
+		}
+	}
+	// the elements were stored in a heap to make it more easy to work with.  We now sort it linearly
+	sort_heap(m_kmv_syn->begin(), m_kmv_syn->end());
+
+	// cleanup the hash function
+	delete hasher;
 }
 
 

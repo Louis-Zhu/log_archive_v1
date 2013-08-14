@@ -15,7 +15,6 @@ Log_Entry::Log_Entry(const char *str, uint length)
 , m_strLength(length)
 , m_index(NEXT_INDEX++)
 {
-	//m_index = NEXT_INDEX++;
 	mp_kmvSyn = new kmvEst(str, length);
 }
 

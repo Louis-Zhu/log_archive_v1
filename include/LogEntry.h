@@ -48,6 +48,14 @@ public:
 	inline const kmvEst *get_kmvSyn()
 	{ return mp_kmvSyn; }
 
+	/**
+	 * forget the kmvEst stored in this log entry.
+	 * This is used if another object wants to take responsibility
+	 * for the kmvEst memory consumed (such as the BucketBlock)
+	 */
+	inline const void forget_kmvSyn()
+	{ mp_kmvSyn = NULL; }
+
 private:
 	const char   *mp_contents;
 	kmvEst *mp_kmvSyn;
